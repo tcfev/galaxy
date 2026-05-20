@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>TCF Galaxy — The Democratic Ecosystem</title>
+  <meta name="description" content="Explore the interconnected ecosystem of projects building democratic infrastructure for Iran's future." />
+  <!-- Preconnect for Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ── Star field (canvas) ─────────────────────────────── -->
+  <canvas id="starfield" aria-hidden="true"></canvas>
+
+  <!-- ── Force-directed graph (SVG) ─────────────────────── -->
+  <svg id="graph" role="img" aria-label="TCF Ecosystem Galaxy Map — interactive project network"></svg>
+
+  <!-- ── Top Bar ─────────────────────────────────────────── -->
+  <header id="topbar">
+    <div id="logo">
+      <span id="logo-dot" aria-hidden="true"></span>
+      <div>
+        <div id="logo-text">TCF Galaxy</div>
+        <div id="logo-sub">The Democratic Ecosystem</div>
+      </div>
+    </div>
+
+    <nav id="nav-links" style="display:flex;gap:4px;background:rgba(17,17,17,0.75);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.06);border-radius:40px;padding:5px;pointer-events:all">
+      <button class="filter-pill active" style="font-size:12px" onclick="void 0">Galaxy</button>
+      <button class="filter-pill" style="font-size:12px" onclick="location.href='circuit.html'">Circuit</button>
+      <button class="filter-pill" style="font-size:12px" onclick="location.href='voronoi.html'">Voronoi</button>
+      <button class="filter-pill" style="font-size:12px" onclick="location.href='map.html'">Map</button>
+    </nav>
+
+    <nav id="filters" aria-label="Filter projects by category">
+      <button class="filter-pill active" data-category="all">All</button>
+      <button class="filter-pill" data-category="framework">
+        <span class="filter-dot" style="background:#5B9DF5;box-shadow:0 0 6px #5B9DF5"></span>Framework
+      </button>
+      <button class="filter-pill" data-category="infrastructure">
+        <span class="filter-dot" style="background:#38BDF8;box-shadow:0 0 6px #38BDF8"></span>Infrastructure
+      </button>
+      <button class="filter-pill" data-category="democracy">
+        <span class="filter-dot" style="background:#AC95DC;box-shadow:0 0 6px #AC95DC"></span>Democracy
+      </button>
+      <button class="filter-pill" data-category="knowledge">
+        <span class="filter-dot" style="background:#0EBB90;box-shadow:0 0 6px #0EBB90"></span>Knowledge
+      </button>
+      <button class="filter-pill" data-category="community">
+        <span class="filter-dot" style="background:#F9C452;box-shadow:0 0 6px #F9C452"></span>Community
+      </button>
+    </nav>
+  </header>
+
+  <!-- ── Detail Panel (slides in from right / up on mobile) ── -->
+  <aside id="panel" aria-hidden="true" aria-label="Project details">
+    <!-- Top accent bar -->
+    <div id="panel-accent"></div>
+
+    <div id="panel-inner">
+      <div id="panel-header">
+        <div>
+          <div id="panel-badge">Active</div>
+        </div>
+        <button id="panel-close" aria-label="Close panel">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <h2 id="panel-title"></h2>
+      <p id="panel-fullname"></p>
+      <p id="panel-tagline"></p>
+      <p id="panel-description"></p>
+
+      <div id="panel-links"></div>
+
+      <div id="panel-related">
+        <div id="panel-related-label">Connected to</div>
+        <div id="panel-related-list"></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Bottom Bar ───────────────────────────────────────── -->
+  <div id="bottom-bar" aria-hidden="true">
+    <p id="hint">Scroll to zoom &nbsp;·&nbsp; Drag to pan &nbsp;·&nbsp; Click to explore</p>
+  </div>
+
+  <div id="node-count" aria-hidden="true">11 projects · 15 connections</div>
+
+  <!-- Reset zoom button -->
+  <button id="btn-reset" aria-label="Reset zoom and pan">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M13 8A5 5 0 1 1 8 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M13 3v5h-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+
+  <!-- ── Scripts ──────────────────────────────────────────── -->
+  <!-- D3.js v7 -->
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <script src="data.js"></script>
+  <script src="starfield.js"></script>
+  <script src="graph.js"></script>
+
+</body>
+</html>

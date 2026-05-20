@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TCF Galaxy — Circuit Board</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: #040c16;
+      font-family: 'Inter', sans-serif;
+      color: rgba(255,255,255,0.9);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    canvas#c { position: fixed; inset: 0; z-index: 0; }
+
+    /* ── Chips ─────────────────────────────────────────────── */
+    #chips { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
+
+    .chip {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      pointer-events: all;
+      cursor: pointer;
+      padding: 7px 13px 8px;
+      background: linear-gradient(160deg, #071828 0%, #040e1c 100%);
+      border-radius: 4px;
+      border: 1px solid var(--clr, #5B9DF5);
+      box-shadow: 0 0 18px color-mix(in srgb, var(--clr, #5B9DF5) 18%, transparent),
+                  inset 0 1px 0 rgba(255,255,255,0.05);
+      transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+      user-select: none;
+      min-width: 86px;
+      white-space: nowrap;
+    }
+    .chip:hover,
+    .chip.selected {
+      transform: translate(-50%, -50%) scale(1.08);
+      box-shadow: 0 0 32px color-mix(in srgb, var(--clr, #5B9DF5) 45%, transparent),
+                  0 0 60px color-mix(in srgb, var(--clr, #5B9DF5) 12%, transparent),
+                  inset 0 1px 0 rgba(255,255,255,0.08);
+      border-color: var(--clr, #5B9DF5);
+    }
+
+    .chip-header {
+      display: flex; align-items: center;
+      justify-content: space-between; gap: 8px;
+      margin-bottom: 3px;
+    }
+    .chip-ref {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 8.5px; font-weight: 400;
+      color: rgba(255,255,255,0.28);
+      letter-spacing: 0.06em;
+    }
+    .chip-led {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--clr, #5B9DF5);
+      box-shadow: 0 0 7px var(--clr, #5B9DF5);
+      animation: led var(--blink, 2.4s) ease-in-out infinite;
+    }
+    @keyframes led {
+      0%,100% { opacity: 1; } 50% { opacity: 0.3; }
+    }
+    .chip-name {
+      font-size: 13px; font-weight: 600;
+      color: rgba(255,255,255,0.94);
+      line-height: 1.2;
+    }
+    .chip-sub {
+      font-size: 8.5px; font-weight: 500;
+      color: var(--clr, #5B9DF5);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-top: 2px;
+      opacity: 0.75;
+    }
+
+    /* ── Scan-line overlay ─────────────────────────────────── */
+    #scanlines {
+      position: fixed; inset: 0; z-index: 1;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0px,
+        transparent 2px,
+        rgba(0,0,0,0.08) 2px,
+        rgba(0,0,0,0.08) 3px
+      );
+    }
+
+    /* ── Panel ─────────────────────────────────────────────── */
+    #panel {
+      position: fixed; top: 0; right: 0; bottom: 0;
+      width: 380px; max-width: 92vw;
+      background: rgba(4, 12, 22, 0.96);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-left: 1px solid rgba(0, 200, 240, 0.08);
+      z-index: 20;
+      transform: translateX(100%);
+      transition: transform 0.5s cubic-bezier(0.4,0,0.2,1);
+      overflow-y: auto;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    #panel.open { transform: translateX(0); box-shadow: -24px 0 80px rgba(0,0,0,0.7); }
+
+    #panel-accent { height: 2px; width: 100%; }
+    #panel-inner { padding: 0 26px 48px; }
+    #panel-head {
+      display: flex; align-items: flex-start;
+      justify-content: space-between;
+      padding-top: 22px; margin-bottom: 18px;
+    }
+    #panel-close {
+      width: 28px; height: 28px; border-radius: 4px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.5); font-size: 12px;
+      cursor: pointer; display: flex; align-items: center;
+      justify-content: center; flex-shrink: 0;
+      transition: background 0.2s, color 0.2s;
+      font-family: inherit;
+    }
+    #panel-close:hover { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.9); }
+
+    #panel-badge {
+      display: inline-flex; align-items: center;
+      padding: 2px 10px; border-radius: 3px;
+      border: 1px solid; font-size: 9px; font-weight: 600;
+      letter-spacing: 0.12em; text-transform: uppercase;
+    }
+    #panel-title {
+      font-size: 26px; font-weight: 700;
+      font-family: 'Inter', sans-serif;
+      color: rgba(255,255,255,0.95); line-height: 1.15;
+      margin-top: 10px;
+    }
+    #panel-fullname {
+      font-size: 11px; color: rgba(255,255,255,0.35);
+      margin-top: 4px; font-family: 'Inter', sans-serif;
+    }
+    #panel-prompt {
+      font-size: 10px; color: rgba(0,220,240,0.5);
+      margin-top: 18px; padding-top: 18px;
+      border-top: 1px solid rgba(0,200,240,0.08);
+    }
+    #panel-tagline {
+      font-size: 13px; color: rgba(0,220,240,0.85);
+      line-height: 1.55; margin-top: 4px;
+      font-family: 'Inter', sans-serif;
+    }
+    #panel-description {
+      font-size: 12px; font-family: 'Inter', sans-serif;
+      color: rgba(255,255,255,0.5); line-height: 1.75;
+      margin-top: 14px;
+    }
+    #panel-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+    .panel-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 3px; border: 1px solid;
+      font-size: 11px; font-weight: 500;
+      font-family: 'JetBrains Mono', monospace;
+      text-decoration: none;
+      transition: background 0.2s;
+    }
+    .panel-link:hover { background: rgba(255,255,255,0.04); }
+
+    #panel-related { margin-top: 24px; padding-top: 18px; border-top: 1px solid rgba(0,200,240,0.08); }
+    #panel-related-label {
+      font-size: 9px; font-weight: 600; letter-spacing: 0.14em;
+      text-transform: uppercase; color: rgba(255,255,255,0.25); margin-bottom: 10px;
+    }
+    #panel-related-list { display: flex; flex-wrap: wrap; gap: 7px; }
+    .related-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px; border-radius: 3px; border: 1px solid;
+      background: transparent; font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .related-chip:hover { background: rgba(255,255,255,0.04); }
+    .chip-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── Topbar ─────────────────────────────────────────────── */
+    #topbar {
+      position: fixed; top: 0; left: 0; right: 0;
+      z-index: 10; display: flex; align-items: center;
+      gap: 16px; padding: 14px 22px; pointer-events: none;
+    }
+    #logo { display: flex; align-items: center; gap: 10px; pointer-events: all; }
+    #logo-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #00d4f0; box-shadow: 0 0 10px #00d4f0;
+    }
+    #logo-text { font-size: 14px; font-weight: 600; }
+    #logo-sub { font-size: 11px; color: rgba(255,255,255,0.35); font-family: 'JetBrains Mono', monospace; }
+
+    #nav-links {
+      display: flex; gap: 8px;
+      background: rgba(4,12,22,0.8);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(0,200,240,0.08);
+      border-radius: 4px;
+      padding: 5px;
+      pointer-events: all;
+    }
+    .design-pill {
+      padding: 5px 14px; border-radius: 3px; border: none;
+      background: transparent; color: rgba(255,255,255,0.4);
+      font-size: 12px; font-family: 'JetBrains Mono', monospace;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .design-pill:hover { color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.05); }
+    .design-pill.active { background: rgba(0,200,240,0.12); color: rgba(0,220,240,0.9); }
+
+    /* ── Hint + reset ──────────────────────────────────────── */
+    #hint {
+      position: fixed; bottom: 22px; left: 50%;
+      transform: translateX(-50%); z-index: 5;
+      font-size: 11px; font-family: 'JetBrains Mono', monospace;
+      color: rgba(255,255,255,0.2); pointer-events: none;
+      text-align: center; transition: opacity 0.8s;
+    }
+
+    #panel::-webkit-scrollbar { width: 3px; }
+    #panel::-webkit-scrollbar-thumb { background: rgba(0,200,240,0.15); border-radius: 3px; }
+
+    @media (max-width: 700px) {
+      #panel {
+        width: 100%; top: auto; height: 68vh; border-left: none;
+        border-top: 1px solid rgba(0,200,240,0.08);
+        border-radius: 16px 16px 0 0;
+        transform: translateY(100%);
+      }
+      #panel.open { transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="c"></canvas>
+  <div id="scanlines" aria-hidden="true"></div>
+  <div id="chips"></div>
+
+  <!-- Panel -->
+  <aside id="panel" aria-hidden="true">
+    <div id="panel-accent"></div>
+    <div id="panel-inner">
+      <div id="panel-head">
+        <div id="panel-badge">Active</div>
+        <button id="panel-close">✕</button>
+      </div>
+      <h2 id="panel-title"></h2>
+      <p id="panel-fullname"></p>
+      <div id="panel-prompt">// description</div>
+      <p id="panel-tagline"></p>
+      <p id="panel-description"></p>
+      <div id="panel-links"></div>
+      <div id="panel-related">
+        <div id="panel-related-label">// linked modules</div>
+        <div id="panel-related-list"></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Topbar -->
+  <header id="topbar">
+    <div id="logo">
+      <span id="logo-dot"></span>
+      <div>
+        <div id="logo-text">TCF Galaxy</div>
+        <div id="logo-sub">circuit_board.view</div>
+      </div>
+    </div>
+    <nav id="nav-links">
+      <button class="design-pill" onclick="location.href='index.html'">Galaxy</button>
+      <button class="design-pill active">Circuit</button>
+      <button class="design-pill" onclick="location.href='voronoi.html'">Voronoi</button>
+      <button class="design-pill" onclick="location.href='map.html'">Map</button>
+    </nav>
+  </header>
+
+  <div id="hint">hover a chip to trace its connections &nbsp;·&nbsp; click to inspect</div>
+
+  <script src="data.js"></script>
+  <script>
+  'use strict';
+  (function () {
+
+    /* ── Layout: fixed positions (fraction of viewport) ─────── */
+    const LAYOUT = {
+      'tcf':           [0.10, 0.47],
+      'dfii':          [0.24, 0.16],
+      'jomhoor':       [0.40, 0.47],
+      'wallet':        [0.60, 0.26],
+      'sso':           [0.60, 0.47],
+      'inid':          [0.60, 0.67],
+      'taraaz':        [0.78, 0.22],
+      'compass':       [0.78, 0.42],
+      'difcongress':   [0.78, 0.62],
+      'iranians-vote': [0.78, 0.82],
+      'atlas':         [0.22, 0.78],
+      'university':    [0.08, 0.78],
+    };
+
+    const CHIP_REFS = {
+      'tcf':'U1','dfii':'U2','jomhoor':'U3','wallet':'U4','sso':'U5',
+      'inid':'U6','taraaz':'U7','compass':'U8','iranians-vote':'U9',
+      'atlas':'U10','university':'U11','difcongress':'U12',
+    };
+
+    let W = window.innerWidth, H = window.innerHeight;
+    let selectedId = null;
+    let hoveredId  = null;
+
+    /* ── Canvas ─────────────────────────────────────────────── */
+    const canvas = document.getElementById('c');
+    const ctx    = canvas.getContext('2d');
+    canvas.width  = W;
+    canvas.height = H;
+
+    /* ── Compute pixel positions ─────────────────────────────── */
+    function getPos(id) {
+      const [px, py] = LAYOUT[id];
+      return { x: px * W, y: py * H };
+    }
+
+    /* ── Chips (HTML) ───────────────────────────────────────── */
+    const chipsEl = document.getElementById('chips');
+    const chipEls = {};
+
+    let refIdx = 1;
+    TCF_DATA.nodes.forEach(node => {
+      const pos = getPos(node.id);
+      const el = document.createElement('div');
+      el.className = 'chip';
+      el.id = `chip-${node.id}`;
+      el.style.setProperty('--clr', node.color);
+      el.style.setProperty('--blink', `${1.8 + Math.random() * 2}s`);
+      el.style.left = `${pos.x}px`;
+      el.style.top  = `${pos.y}px`;
+
+      el.innerHTML = `
+        <div class="chip-header">
+          <span class="chip-ref">${CHIP_REFS[node.id] || 'U?'}</span>
+          <span class="chip-led"></span>
+        </div>
+        <div class="chip-name">${node.label}</div>
+        <div class="chip-sub">${node.category}</div>
+      `;
+      el.addEventListener('click',      (e) => { e.stopPropagation(); onSelect(node); });
+      el.addEventListener('mouseenter', () => { hoveredId = node.id; });
+      el.addEventListener('mouseleave', () => { if (hoveredId === node.id) hoveredId = null; });
+      chipsEl.appendChild(el);
+      chipEls[node.id] = el;
+    });
+
+    /* ── Build link lookup ──────────────────────────────────── */
+    function connectedIds(id) {
+      const set = new Set();
+      TCF_DATA.links.forEach(l => {
+        if (l.source === id) set.add(l.target);
+        if (l.target === id) set.add(l.source);
+      });
+      return set;
+    }
+
+    /* ── Particles ──────────────────────────────────────────── */
+    const particles = [];
+    TCF_DATA.links.forEach((link, i) => {
+      const count = Math.round(1 + (link.strength || 0.5) * 2);
+      for (let k = 0; k < count; k++) {
+        particles.push({
+          linkIdx: i,
+          t: Math.random(),
+          speed: 0.0015 + Math.random() * 0.002,
+          size:  1.5 + Math.random(),
+        });
+      }
+    });
+
+    /* ── Orthogonal path helper ─────────────────────────────── */
+    function orthPath(x1, y1, x2, y2) {
+      const midX = (x1 + x2) / 2;
+      return [[x1,y1],[midX,y1],[midX,y2],[x2,y2]];
+    }
+
+    function pointOnPath(pts, t) {
+      const segs = [];
+      let total = 0;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const dx = pts[i+1][0] - pts[i][0];
+        const dy = pts[i+1][1] - pts[i][1];
+        const len = Math.sqrt(dx*dx + dy*dy);
+        segs.push(len);
+        total += len;
+      }
+      let d = t * total;
+      for (let i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) {
+          const r = segs[i] > 0 ? d / segs[i] : 0;
+          return {
+            x: pts[i][0] + r * (pts[i+1][0] - pts[i][0]),
+            y: pts[i][1] + r * (pts[i+1][1] - pts[i][1]),
+          };
+        }
+        d -= segs[i];
+      }
+      return { x: pts[pts.length-1][0], y: pts[pts.length-1][1] };
+    }
+
+    /* ── Background (draw once) ─────────────────────────────── */
+    function drawBackground() {
+      ctx.fillStyle = '#040c16';
+      ctx.fillRect(0, 0, W, H);
+
+      // Vignette
+      const vg = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W,H)*0.75);
+      vg.addColorStop(0, 'rgba(0,40,80,0.0)');
+      vg.addColorStop(1, 'rgba(0,0,0,0.65)');
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, W, H);
+
+      // Dot grid
+      ctx.fillStyle = 'rgba(0, 180, 220, 0.10)';
+      const step = 28;
+      for (let x = step; x < W; x += step) {
+        for (let y = step; y < H; y += step) {
+          ctx.beginPath();
+          ctx.arc(x, y, 0.7, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // Center ambient glow
+      const glow = ctx.createRadialGradient(W*0.4, H*0.47, 0, W*0.4, H*0.47, W*0.45);
+      glow.addColorStop(0, 'rgba(0, 60, 120, 0.25)');
+      glow.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, W, H);
+
+      // Corner marks (PCB crop marks)
+      ctx.strokeStyle = 'rgba(0,200,240,0.15)';
+      ctx.lineWidth = 1;
+      [[12,12],[W-12,12],[12,H-12],[W-12,H-12]].forEach(([cx,cy]) => {
+        const s = 14;
+        ctx.beginPath();
+        ctx.moveTo(cx-s,cy); ctx.lineTo(cx-4,cy);
+        ctx.moveTo(cx,cy-s); ctx.lineTo(cx,cy-4);
+        ctx.stroke();
+      });
+    }
+
+    /* ── Draw trace ─────────────────────────────────────────── */
+    function drawTrace(pts, color, strength, highlight) {
+      const alpha   = highlight ? 0.55 : 0.14;
+      const glowAlpha = highlight ? 0.9 : 0.35;
+      const width   = Math.max(0.8, (strength || 0.5) * 1.8);
+
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+
+      // Base trace
+      ctx.strokeStyle = color + Math.round(alpha * 255).toString(16).padStart(2,'0');
+      ctx.lineWidth = width + 1.5;
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.stroke();
+
+      // Bright glow line
+      ctx.shadowColor = color;
+      ctx.shadowBlur  = highlight ? 10 : 4;
+      ctx.strokeStyle = color + Math.round(glowAlpha * 255).toString(16).padStart(2,'0');
+      ctx.lineWidth   = width;
+      ctx.stroke();
+      ctx.shadowBlur  = 0;
+
+      // Endpoint dots
+      [[pts[0][0],pts[0][1]],[pts[pts.length-1][0],pts[pts.length-1][1]]].forEach(([x,y]) => {
+        ctx.beginPath();
+        ctx.arc(x, y, 2.5, 0, Math.PI*2);
+        ctx.fillStyle = color + (highlight ? 'cc' : '40');
+        ctx.fill();
+      });
+    }
+
+    /* ── Animation loop ─────────────────────────────────────── */
+    let frame = 0;
+    function animate() {
+      requestAnimationFrame(animate);
+      ctx.clearRect(0, 0, W, H);
+      drawBackground();
+
+      const active = selectedId || hoveredId;
+      const activeConn = active ? connectedIds(active) : null;
+
+      // 1. Draw all traces
+      TCF_DATA.links.forEach((link, i) => {
+        const src = TCF_DATA.nodes.find(n => n.id === link.source);
+        const p1  = getPos(link.source);
+        const p2  = getPos(link.target);
+        const pts = orthPath(p1.x, p1.y, p2.x, p2.y);
+
+        const highlight = active &&
+          (link.source === active || link.target === active ||
+           activeConn.has(link.source) && activeConn.has(link.target));
+
+        drawTrace(pts, src.color, link.strength, highlight);
+      });
+
+      // 2. Animate particles
+      particles.forEach(p => {
+        p.t += p.speed;
+        if (p.t > 1) p.t -= 1;
+
+        const link = TCF_DATA.links[p.linkIdx];
+        const src  = TCF_DATA.nodes.find(n => n.id === link.source);
+        const p1   = getPos(link.source);
+        const p2   = getPos(link.target);
+        const pts  = orthPath(p1.x, p1.y, p2.x, p2.y);
+        const pos  = pointOnPath(pts, p.t);
+
+        const isActive = !active ||
+          link.source === active || link.target === active;
+        const alpha = isActive ? 0.9 : 0.15;
+        const size  = isActive ? p.size * 1.4 : p.size * 0.7;
+
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, size, 0, Math.PI * 2);
+        ctx.shadowColor = src.color;
+        ctx.shadowBlur  = isActive ? 8 : 2;
+        ctx.fillStyle   = src.color + Math.round(alpha * 255).toString(16).padStart(2,'0');
+        ctx.fill();
+        ctx.shadowBlur  = 0;
+      });
+
+      // 3. Dim non-connected chips
+      TCF_DATA.nodes.forEach(n => {
+        const el = chipEls[n.id];
+        if (!active) { el.style.opacity = '1'; return; }
+        const isActive = n.id === active || activeConn.has(n.id);
+        el.style.opacity = isActive ? '1' : '0.2';
+      });
+
+      frame++;
+    }
+
+    /* ── Panel ──────────────────────────────────────────────── */
+    function showPanel(node) {
+      const conn = connectedIds(node.id);
+      const related = TCF_DATA.nodes.filter(n => conn.has(n.id));
+
+      document.getElementById('panel-title').textContent    = node.label;
+      document.getElementById('panel-fullname').textContent = node.fullName;
+      document.getElementById('panel-tagline').textContent  = node.tagline;
+      document.getElementById('panel-description').textContent = node.description;
+
+      const badge = document.getElementById('panel-badge');
+      badge.textContent = node.status;
+      badge.style.borderColor = node.color;
+      badge.style.color = node.color;
+
+      document.getElementById('panel-accent').style.background = node.color;
+
+      document.getElementById('panel-links').innerHTML = (node.links || [])
+        .map(l => `<a href="${l.url}" target="_blank" rel="noopener" class="panel-link"
+                      style="border-color:${node.color}33;color:${node.color}">
+                    ${l.label} ↗
+                   </a>`).join('');
+
+      const relList = document.getElementById('panel-related-list');
+      relList.innerHTML = related.map(n =>
+        `<button class="related-chip" data-id="${n.id}"
+                 style="border-color:${n.color}3a;color:${n.color}99">
+           <span class="chip-dot" style="background:${n.color}"></span>${n.label}
+         </button>`).join('');
+      relList.querySelectorAll('.related-chip').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          const n = TCF_DATA.nodes.find(x => x.id === btn.dataset.id);
+          if (n) onSelect(n);
+        });
+      });
+
+      document.getElementById('panel').setAttribute('aria-hidden','false');
+      document.getElementById('panel').classList.add('open');
+      document.getElementById('hint').style.opacity = '0';
+    }
+
+    function closePanel() {
+      selectedId = null;
+      document.getElementById('panel').setAttribute('aria-hidden','true');
+      document.getElementById('panel').classList.remove('open');
+      Object.values(chipEls).forEach(el => el.classList.remove('selected'));
+    }
+
+    function onSelect(node) {
+      selectedId = node.id;
+      Object.values(chipEls).forEach(el => el.classList.remove('selected'));
+      chipEls[node.id].classList.add('selected');
+      showPanel(node);
+    }
+
+    document.getElementById('panel-close').addEventListener('click', e => {
+      e.stopPropagation(); closePanel();
+    });
+    document.addEventListener('click', () => { if (selectedId) closePanel(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
+
+    /* ── Resize ─────────────────────────────────────────────── */
+    window.addEventListener('resize', () => {
+      W = window.innerWidth; H = window.innerHeight;
+      canvas.width = W; canvas.height = H;
+      TCF_DATA.nodes.forEach(node => {
+        const pos = getPos(node.id);
+        chipEls[node.id].style.left = `${pos.x}px`;
+        chipEls[node.id].style.top  = `${pos.y}px`;
+      });
+    });
+
+    /* ── Start ──────────────────────────────────────────────── */
+    animate();
+
+  })();
+  </script>
+</body>
+</html>

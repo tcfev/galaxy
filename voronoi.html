@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TCF Galaxy — Voronoi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: #06080f;
+      font-family: 'Inter', sans-serif;
+      color: rgba(255,255,255,0.9);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    canvas#c { position: fixed; inset: 0; z-index: 0; }
+
+    /* ── Topbar ─────────────────────────────────────────────── */
+    #topbar {
+      position: fixed; top: 0; left: 0; right: 0;
+      z-index: 10; display: flex; align-items: center;
+      gap: 16px; padding: 14px 22px; pointer-events: none;
+    }
+    #logo { display: flex; align-items: center; gap: 10px; pointer-events: all; }
+    #logo-dot {
+      width: 9px; height: 9px; border-radius: 50%;
+      background: #AC95DC; box-shadow: 0 0 12px #AC95DC;
+    }
+    #logo-text { font-size: 14px; font-weight: 600; }
+    #logo-sub { font-size: 11px; color: rgba(255,255,255,0.3); }
+
+    #nav-links {
+      display: flex; gap: 8px;
+      background: rgba(6,8,15,0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 40px;
+      padding: 5px;
+      pointer-events: all;
+    }
+    .design-pill {
+      padding: 5px 14px; border-radius: 30px; border: none;
+      background: transparent; color: rgba(255,255,255,0.4);
+      font-size: 12px; font-family: inherit;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .design-pill:hover { color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.06); }
+    .design-pill.active { background: rgba(172,149,220,0.18); color: rgba(172,149,220,0.95); }
+
+    /* ── Tooltip (hover label) ──────────────────────────────── */
+    #tooltip {
+      position: fixed; z-index: 8;
+      background: rgba(6,8,15,0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px;
+      padding: 12px 16px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      max-width: 220px;
+    }
+    #tooltip.visible { opacity: 1; }
+    #tt-name { font-size: 15px; font-weight: 600; }
+    #tt-tag { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 3px; line-height: 1.4; }
+
+    /* ── Panel ─────────────────────────────────────────────── */
+    #panel {
+      position: fixed; top: 0; right: 0; bottom: 0;
+      width: 380px; max-width: 92vw;
+      background: rgba(6, 8, 15, 0.96);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      border-left: 1px solid rgba(255,255,255,0.06);
+      z-index: 20;
+      transform: translateX(100%);
+      transition: transform 0.5s cubic-bezier(0.4,0,0.2,1);
+      overflow-y: auto;
+    }
+    #panel.open { transform: translateX(0); box-shadow: -24px 0 80px rgba(0,0,0,0.6); }
+
+    #panel-accent { height: 3px; width: 100%; }
+    #panel-inner { padding: 0 28px 48px; }
+    #panel-head {
+      display: flex; align-items: flex-start;
+      justify-content: space-between;
+      padding-top: 22px; margin-bottom: 18px;
+    }
+    #panel-close {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.09);
+      color: rgba(255,255,255,0.5); font-size: 13px;
+      cursor: pointer; display: flex; align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+    #panel-close:hover { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.9); }
+
+    #panel-badge {
+      display: inline-flex; align-items: center;
+      padding: 3px 11px; border-radius: 20px; border: 1px solid;
+      font-size: 10px; font-weight: 600;
+      letter-spacing: 0.1em; text-transform: uppercase;
+    }
+    #panel-title { font-size: 28px; font-weight: 700; color: rgba(255,255,255,0.95); margin-top: 10px; }
+    #panel-fullname { font-size: 12.5px; color: rgba(255,255,255,0.35); margin-top: 4px; }
+    #panel-tagline {
+      font-size: 14px; color: rgba(255,255,255,0.7); font-style: italic;
+      line-height: 1.55; margin-top: 16px; padding-top: 16px;
+      border-top: 1px solid rgba(255,255,255,0.05);
+    }
+    #panel-description { font-size: 13.5px; color: rgba(255,255,255,0.52); line-height: 1.75; margin-top: 14px; }
+    #panel-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+    .panel-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 13px; border-radius: 8px; border: 1px solid;
+      font-size: 13px; font-weight: 500;
+      text-decoration: none; transition: background 0.2s;
+    }
+    .panel-link:hover { background: rgba(255,255,255,0.05); }
+    #panel-related { margin-top: 24px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.05); }
+    #panel-related-label { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.25); margin-bottom: 10px; }
+    #panel-related-list { display: flex; flex-wrap: wrap; gap: 7px; }
+    .related-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 6px; border: 1px solid;
+      background: transparent; font-size: 12px; font-family: inherit;
+      cursor: pointer; transition: background 0.2s;
+    }
+    .related-chip:hover { background: rgba(255,255,255,0.05); }
+    .chip-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── Hint ───────────────────────────────────────────────── */
+    #hint {
+      position: fixed; bottom: 22px; left: 50%;
+      transform: translateX(-50%); z-index: 5;
+      font-size: 12px; color: rgba(255,255,255,0.22);
+      pointer-events: none; text-align: center;
+      transition: opacity 1s;
+    }
+
+    #panel::-webkit-scrollbar { width: 3px; }
+    #panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+    @media (max-width: 700px) {
+      #panel {
+        width: 100%; top: auto; height: 70vh; border-left: none;
+        border-top: 1px solid rgba(255,255,255,0.06);
+        border-radius: 20px 20px 0 0;
+        transform: translateY(100%);
+      }
+      #panel.open { transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="c"></canvas>
+
+  <!-- Hover tooltip -->
+  <div id="tooltip">
+    <div id="tt-name"></div>
+    <div id="tt-tag"></div>
+  </div>
+
+  <!-- Panel -->
+  <aside id="panel" aria-hidden="true">
+    <div id="panel-accent"></div>
+    <div id="panel-inner">
+      <div id="panel-head">
+        <div id="panel-badge">Active</div>
+        <button id="panel-close">✕</button>
+      </div>
+      <h2 id="panel-title"></h2>
+      <p id="panel-fullname"></p>
+      <p id="panel-tagline"></p>
+      <p id="panel-description"></p>
+      <div id="panel-links"></div>
+      <div id="panel-related">
+        <div id="panel-related-label">Connected to</div>
+        <div id="panel-related-list"></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Topbar -->
+  <header id="topbar">
+    <div id="logo">
+      <span id="logo-dot"></span>
+      <div>
+        <div id="logo-text">TCF Galaxy</div>
+        <div id="logo-sub">voronoi view</div>
+      </div>
+    </div>
+    <nav id="nav-links">
+      <button class="design-pill" onclick="location.href='index.html'">Galaxy</button>
+      <button class="design-pill" onclick="location.href='circuit.html'">Circuit</button>
+      <button class="design-pill active">Voronoi</button>
+      <button class="design-pill" onclick="location.href='map.html'">Map</button>
+    </nav>
+  </header>
+
+  <div id="hint">hover to explore &nbsp;·&nbsp; click to inspect</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <script src="data.js"></script>
+  <script>
+  'use strict';
+  (function () {
+
+    let W = window.innerWidth;
+    let H = window.innerHeight;
+    let selectedId = null;
+    let hoveredId  = null;
+    let animPhase  = 0;
+
+    const canvas = document.getElementById('c');
+    const ctx    = canvas.getContext('2d');
+    canvas.width  = W;
+    canvas.height = H;
+
+    /* ── Category colors (semi-transparent fills) ────────────── */
+    const CAT_COLORS = {
+      framework:      '#5B9DF5',
+      infrastructure: '#38BDF8',
+      democracy:      '#AC95DC',
+      knowledge:      '#0EBB90',
+      community:      '#F9C452',
+    };
+
+    /* ── Initial positions: seeded layout to give space to large nodes ── */
+    const BASE_POSITIONS = {
+      'tcf':           [0.22, 0.38],
+      'dfii':          [0.48, 0.20],
+      'jomhoor':       [0.50, 0.55],
+      'wallet':        [0.72, 0.32],
+      'sso':           [0.70, 0.58],
+      'inid':          [0.82, 0.72],
+      'iranians-vote': [0.60, 0.80],
+      'taraaz':        [0.85, 0.42],
+      'compass':       [0.78, 0.18],
+      'difcongress':   [0.92, 0.28],
+      'atlas':         [0.28, 0.72],
+      'university':    [0.12, 0.65],
+    };
+
+    /* ── Points: animated slight drift (breathing) ────────────── */
+    const points = TCF_DATA.nodes.map(node => {
+      const [bx, by] = BASE_POSITIONS[node.id] || [Math.random(), Math.random()];
+      return {
+        id:    node.id,
+        node,
+        bx: bx * W, by: by * H,    // base
+        x:  bx * W, y:  by * H,    // current (animated)
+        driftAmp:  6 + Math.random() * 8,
+        driftFreq: 0.0003 + Math.random() * 0.0004,
+        driftPhase: Math.random() * Math.PI * 2,
+        expandTarget: 0, // 0=normal, 1=expanded
+        expandCurrent: 0,
+      };
+    });
+
+    /* ── Connected ids lookup ────────────────────────────────── */
+    function connectedIds(id) {
+      const set = new Set();
+      TCF_DATA.links.forEach(l => {
+        if (l.source === id) set.add(l.target);
+        if (l.target === id) set.add(l.source);
+      });
+      return set;
+    }
+
+    /* ── Voronoi ─────────────────────────────────────────────── */
+    function computeVoronoi() {
+      const coords = points.map(p => [p.x, p.y]);
+      const delaunay = d3.Delaunay.from(coords);
+      return delaunay.voronoi([0, 0, W, H]);
+    }
+
+    /* ── Hex color → rgba ────────────────────────────────────── */
+    function hexToRGBA(hex, alpha) {
+      const r = parseInt(hex.slice(1,3),16);
+      const g = parseInt(hex.slice(3,5),16);
+      const b = parseInt(hex.slice(5,7),16);
+      return `rgba(${r},${g},${b},${alpha})`;
+    }
+
+    /* ── Draw cell ───────────────────────────────────────────── */
+    function drawCell(voronoi, i, pt) {
+      const cell = voronoi.cellPolygon(i);
+      if (!cell) return;
+
+      const node   = pt.node;
+      const color  = CAT_COLORS[node.category] || node.color;
+      const isHov  = hoveredId  === node.id;
+      const isSel  = selectedId === node.id;
+      const active = selectedId || hoveredId;
+      const isConn = active ? connectedIds(active).has(node.id) : false;
+      const isActive = !active || node.id === active || isConn;
+
+      const fillAlpha  = isSel ? 0.28 : isHov ? 0.22 : isActive ? 0.10 : 0.03;
+      const borderAlpha = isSel ? 0.85 : isHov ? 0.70 : isActive ? 0.30 : 0.08;
+      const borderW    = isSel ? 2.5  : isHov ? 1.8  : 1;
+
+      ctx.beginPath();
+      ctx.moveTo(cell[0][0], cell[0][1]);
+      for (let j = 1; j < cell.length; j++) ctx.lineTo(cell[j][0], cell[j][1]);
+      ctx.closePath();
+
+      // Fill with radial gradient centered on seed point
+      const grad = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, 260);
+      grad.addColorStop(0, hexToRGBA(color, fillAlpha * 2.2));
+      grad.addColorStop(0.5, hexToRGBA(color, fillAlpha));
+      grad.addColorStop(1, hexToRGBA(color, fillAlpha * 0.15));
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // Border
+      ctx.strokeStyle = hexToRGBA(color, borderAlpha);
+      ctx.lineWidth   = borderW;
+      if (isSel || isHov) {
+        ctx.shadowColor = color;
+        ctx.shadowBlur  = 12;
+      }
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+
+    /* ── Draw seed dot ────────────────────────────────────────── */
+    function drawSeed(pt) {
+      const node  = pt.node;
+      const color = CAT_COLORS[node.category] || node.color;
+      const isHov = hoveredId  === node.id;
+      const isSel = selectedId === node.id;
+      const active = selectedId || hoveredId;
+      const isConn = active ? connectedIds(active).has(node.id) : false;
+      const isActive = !active || node.id === active || isConn;
+
+      const r = isSel ? 14 : isHov ? 12 : isActive ? 8 : 5;
+      const gAlpha = isSel ? 0.95 : isHov ? 0.85 : isActive ? 0.7 : 0.25;
+
+      // Outer glow ring
+      if (isHov || isSel) {
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, r + 8, 0, Math.PI * 2);
+        ctx.fillStyle = hexToRGBA(color, 0.12);
+        ctx.fill();
+      }
+
+      // Main dot
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2);
+      ctx.shadowColor = color;
+      ctx.shadowBlur  = isHov || isSel ? 20 : 8;
+      ctx.fillStyle   = hexToRGBA(color, gAlpha);
+      ctx.fill();
+      ctx.shadowBlur  = 0;
+
+      // Rim
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2);
+      ctx.strokeStyle = hexToRGBA(color, 0.6);
+      ctx.lineWidth   = 1.5;
+      ctx.stroke();
+    }
+
+    /* ── Draw label ────────────────────────────────────────────  */
+    function drawLabel(pt) {
+      const node  = pt.node;
+      const color = CAT_COLORS[node.category] || node.color;
+      const isHov = hoveredId  === node.id;
+      const isSel = selectedId === node.id;
+      const active = selectedId || hoveredId;
+      const isConn = active ? connectedIds(active).has(node.id) : false;
+      const isActive = !active || node.id === active || isConn;
+
+      if (!isActive) return;
+
+      const alpha = isSel ? 0.95 : isHov ? 0.90 : 0.65;
+      const offsetY = (isSel ? 18 : isHov ? 16 : 14);
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+      ctx.font = `${isSel || isHov ? 600 : 500} ${isSel ? 14 : 12}px Inter`;
+      ctx.fillText(node.label, pt.x, pt.y + offsetY);
+
+      if (isHov || isSel) {
+        ctx.fillStyle = hexToRGBA(color, 0.8);
+        ctx.font = '500 10px Inter';
+        ctx.fillText(node.tagline.length > 30 ? node.tagline.slice(0, 28) + '…' : node.tagline,
+                     pt.x, pt.y + offsetY + 14);
+      }
+    }
+
+    /* ── Draw connection lines (for hover/selected) ──────────── */
+    function drawConnections() {
+      const active = selectedId || hoveredId;
+      if (!active) return;
+      const conn = connectedIds(active);
+      const srcPt = points.find(p => p.id === active);
+      if (!srcPt) return;
+
+      conn.forEach(tid => {
+        const tgt = points.find(p => p.id === tid);
+        if (!tgt) return;
+        const srcNode = TCF_DATA.nodes.find(n => n.id === active);
+        const color = srcNode ? (CAT_COLORS[srcNode.category] || srcNode.color) : '#fff';
+
+        ctx.beginPath();
+        ctx.moveTo(srcPt.x, srcPt.y);
+        ctx.lineTo(tgt.x, tgt.y);
+        ctx.strokeStyle = hexToRGBA(color, 0.4);
+        ctx.lineWidth   = 1.2;
+        ctx.setLineDash([4, 6]);
+        ctx.shadowColor = color;
+        ctx.shadowBlur  = 4;
+        ctx.stroke();
+        ctx.shadowBlur  = 0;
+        ctx.setLineDash([]);
+      });
+    }
+
+    /* ── Animation loop ─────────────────────────────────────── */
+    let lastT = 0;
+    function animate(ts) {
+      requestAnimationFrame(animate);
+      animPhase = ts;
+
+      // Update point positions (breathing drift)
+      points.forEach(pt => {
+        const target = hoveredId === pt.id ? 1 : 0;
+        pt.expandCurrent += (target - pt.expandCurrent) * 0.08;
+
+        const drift = pt.driftAmp * (1 + pt.expandCurrent * 1.5);
+        pt.x = pt.bx + Math.sin(ts * pt.driftFreq + pt.driftPhase)         * drift;
+        pt.y = pt.by + Math.cos(ts * pt.driftFreq * 0.7 + pt.driftPhase)   * drift;
+      });
+
+      const voronoi = computeVoronoi();
+
+      // Draw background
+      ctx.fillStyle = '#06080f';
+      ctx.fillRect(0, 0, W, H);
+
+      // Vignette
+      const vg = ctx.createRadialGradient(W/2,H/2,0, W/2,H/2, Math.max(W,H)*0.65);
+      vg.addColorStop(0,'rgba(0,0,0,0)');
+      vg.addColorStop(1,'rgba(0,0,0,0.55)');
+      ctx.fillStyle = vg;
+      ctx.fillRect(0,0,W,H);
+
+      // Draw cells
+      points.forEach((pt, i) => drawCell(voronoi, i, pt));
+
+      // Draw connection lines
+      drawConnections();
+
+      // Draw seeds
+      points.forEach(pt => drawSeed(pt));
+
+      // Draw labels
+      points.forEach(pt => drawLabel(pt));
+    }
+
+    /* ── Mouse ──────────────────────────────────────────────── */
+    function hitTest(mx, my) {
+      // Find closest point within reasonable distance
+      let best = null, bestD = Infinity;
+      points.forEach(pt => {
+        const d = Math.hypot(mx - pt.x, my - pt.y);
+        // Use approximate cell area based on node size
+        if (d < bestD) { bestD = d; best = pt; }
+      });
+      // Use Voronoi for exact cell hit
+      const voronoi = computeVoronoi();
+      const idx = voronoi.delaunay.find(mx, my);
+      return idx >= 0 ? points[idx] : null;
+    }
+
+    canvas.addEventListener('mousemove', e => {
+      const pt = hitTest(e.clientX, e.clientY);
+      const newId = pt ? pt.id : null;
+      if (newId !== hoveredId) {
+        hoveredId = newId;
+        if (newId && !selectedId) showTooltip(pt, e);
+        else hideTooltip();
+      }
+      if (hoveredId && !selectedId) moveTooltip(e);
+    });
+
+    canvas.addEventListener('click', e => {
+      const pt = hitTest(e.clientX, e.clientY);
+      if (pt) {
+        if (selectedId === pt.id) { closePanel(); return; }
+        selectedId = pt.id;
+        hideTooltip();
+        showPanel(pt.node);
+      } else {
+        closePanel();
+      }
+    });
+
+    /* ── Tooltip ────────────────────────────────────────────── */
+    const tooltip = document.getElementById('tooltip');
+    function showTooltip(pt, e) {
+      document.getElementById('tt-name').textContent = pt.node.label;
+      document.getElementById('tt-tag').textContent  = pt.node.tagline;
+      tooltip.style.borderColor = (CAT_COLORS[pt.node.category] || pt.node.color) + '40';
+      tooltip.classList.add('visible');
+      moveTooltip(e);
+    }
+    function moveTooltip(e) {
+      const tx = Math.min(e.clientX + 18, W - 240);
+      const ty = Math.max(e.clientY - 60, 80);
+      tooltip.style.left = `${tx}px`;
+      tooltip.style.top  = `${ty}px`;
+    }
+    function hideTooltip() { tooltip.classList.remove('visible'); }
+
+    /* ── Panel ──────────────────────────────────────────────── */
+    function showPanel(node) {
+      const conn = connectedIds(node.id);
+      const related = TCF_DATA.nodes.filter(n => conn.has(n.id));
+
+      document.getElementById('panel-title').textContent       = node.label;
+      document.getElementById('panel-fullname').textContent    = node.fullName;
+      document.getElementById('panel-tagline').textContent     = node.tagline;
+      document.getElementById('panel-description').textContent = node.description;
+
+      const badge = document.getElementById('panel-badge');
+      badge.textContent = node.status;
+      badge.style.borderColor = node.color; badge.style.color = node.color;
+
+      document.getElementById('panel-accent').style.background = node.color;
+
+      document.getElementById('panel-links').innerHTML = (node.links || [])
+        .map(l => `<a href="${l.url}" target="_blank" rel="noopener" class="panel-link"
+                      style="border-color:${node.color}33;color:${node.color}">${l.label} ↗</a>`).join('');
+
+      const relList = document.getElementById('panel-related-list');
+      relList.innerHTML = related.map(n =>
+        `<button class="related-chip" data-id="${n.id}"
+                 style="border-color:${n.color}3a;color:${n.color}99">
+           <span class="chip-dot" style="background:${n.color}"></span>${n.label}
+         </button>`).join('');
+      relList.querySelectorAll('.related-chip').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          const n = TCF_DATA.nodes.find(x => x.id === btn.dataset.id);
+          if (n) { selectedId = n.id; showPanel(n); }
+        });
+      });
+
+      document.getElementById('panel').setAttribute('aria-hidden','false');
+      document.getElementById('panel').classList.add('open');
+      document.getElementById('hint').style.opacity = '0';
+    }
+
+    function closePanel() {
+      selectedId = null;
+      document.getElementById('panel').setAttribute('aria-hidden','true');
+      document.getElementById('panel').classList.remove('open');
+    }
+
+    document.getElementById('panel-close').addEventListener('click', e => { e.stopPropagation(); closePanel(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
+
+    /* ── Resize ─────────────────────────────────────────────── */
+    window.addEventListener('resize', () => {
+      const scaleX = window.innerWidth  / W;
+      const scaleY = window.innerHeight / H;
+      W = window.innerWidth; H = window.innerHeight;
+      canvas.width = W; canvas.height = H;
+      points.forEach(pt => {
+        pt.bx *= scaleX; pt.by *= scaleY;
+        pt.x  *= scaleX; pt.y  *= scaleY;
+      });
+    });
+
+    /* ── Start ─────────────────────────────────────────────── */
+    requestAnimationFrame(animate);
+
+  })();
+  </script>
+</body>
+</html>
