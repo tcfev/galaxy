@@ -93,7 +93,7 @@ const TCF_DATA = {
       tagline: 'Structured civic dialogue at scale',
       description:
         "Taraaz is a deliberation platform forked from Agora (zkorum), adapted for the Iranian diaspora. It enables structured, nuanced civic conversations that surface both agreement and disagreement across the community — going far beyond simple yes/no votes to build genuine democratic consensus.",
-      links: [],
+      links: [{ label: 'taraaz.jomhoor.org', url: 'https://taraaz.jomhoor.org' }],
       color: '#AC95DC',
     },
     {
@@ -161,10 +161,24 @@ const TCF_DATA = {
       links: [{ label: 'difcongress.com', url: 'https://difcongress.com' }],
       color: '#AC95DC',
     },
+    {
+      id: 'normalcy',
+      label: 'Normalcy',
+      fullName: 'Gate 2 — Normative Compliance Engine',
+      category: 'infrastructure',
+      status: 'Active',
+      size: 22,
+      tagline: 'Human-rights semantic moderation for civic content',
+      description:
+        "Normalcy is Jomhoor's Gate 2 content-compliance service, hooked into the Taraaz API pre-publish pipeline. It uses semantic LLM reasoning — not keyword filtering — to check whether a post advocates, justifies, or normalises violations of an international human-rights baseline: UDHR, ICCPR, Genocide Convention, Rome Statute, and ten other instruments. Content that crosses the line is returned to the author with a reason and a path to revise; policy disagreement is always allowed.",
+      links: [{ label: 'GitHub', url: 'https://github.com/jomhoor/normalcy' }],
+      color: '#38BDF8',
+    },
   ],
 
   links: [
     { source: 'tcf',  target: 'dfii',          strength: 0.8 },
+    { source: 'taraaz', target: 'normalcy',      strength: 0.9 },
     { source: 'tcf',  target: 'jomhoor',        strength: 1.0 },
     { source: 'tcf',  target: 'atlas',          strength: 0.8 },
     { source: 'tcf',  target: 'university',     strength: 0.7 },
