@@ -67,7 +67,7 @@ const TCF_DATA = {
       tagline: 'OAuth2 identity bridge for civic apps',
       description:
         "A wallet-based OAuth2 SSO system (auth-code + PKCE) with mandatory App Attest (iOS) and Play Integrity (Android) verification. Relying parties receive pairwise pseudonymous subjects — your wallet address is never exposed. Powers authentication across Taraaz, Civic Compass, and partner platforms.",
-      links: [{ label: 'sso.jomhoor.org', url: 'https://sso.jomhoor.org' }],
+      links: [{ label: 'sso.jomhoor.org', url: 'https://sso.jomhoor.org/auth/sso' }],
       color: '#38BDF8',
     },
     {
